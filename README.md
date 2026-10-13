@@ -38,6 +38,34 @@ para llevarla a un stack distinto. El código es el medio, no el fin.
 Cuenta lo que quede **subido a los forks antes de las 5:00 p. m.** (17:00). Lo que llegue después no se revisa.
 No hay prórroga: suban avances parciales con commits pequeños durante la prueba.
 
+## Arranque local
+
+Este `compose.yaml` usa los repositorios `api` y `app` como contextos hermanos. Clona los tres repositorios en el mismo directorio:
+
+```text
+workspace/
+├── test-manager-library-3145556-api/
+├── test-manager-library-3145556-app/
+└── test-manager-library-3145556-infra/
+```
+
+Copia `.env.example` como `.env` y cambia los valores marcados para uso local. Luego, desde este repositorio:
+
+```bash
+docker compose up --build
+```
+
+La aplicación queda en `http://localhost:5174/`, la API en `http://localhost:8001/` y PostgreSQL en el puerto local `5433`. El volumen de datos persiste entre reinicios. `docker compose up` **no** crea tablas ni corre migraciones; la base comienza vacía.
+
+Después de iniciar los servicios, aplica el esquema y crea el admin inicial:
+
+```bash
+docker compose exec api php artisan migrate --force
+docker compose exec api php artisan app:ensure-admin
+```
+
+`docker compose down` detiene los contenedores y conserva los datos del volumen. Los valores de `.env.example` son solo para desarrollo local; no los uses en un entorno compartido o de producción.
+
 ## Los seis repositorios
 
 | Repositorio | Qué va ahí |

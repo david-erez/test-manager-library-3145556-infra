@@ -1,0 +1,80 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-library}
+      POSTGRES_USER: ${POSTGRES_USER:-library}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-library-local-only}
+    ports:
+      - "${POSTGRES_PUBLISHED_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: ../test-manager-library-3145556-api
+      dockerfile: ../test-manager-library-3145556-infra/docker/api.Dockerfile
+    environment:
+      APP_NAME: ManagerLibrary
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: ${APP_KEY:-base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      APP_URL: http://localhost:${API_PUBLISHED_PORT:-8001}
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: info
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB:-library}
+      DB_USERNAME: ${POSTGRES_USER:-library}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-library-local-only}
+      DB_SCHEMA: public
+      SESSION_DRIVER: array
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      JWT_SECRET: ${JWT_SECRET:-local-development-only-change-before-use}
+      JWT_TTL_MINUTES: ${JWT_TTL_MINUTES:-480}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-local-only}
+      COVERS_DIR: storage/app/covers
+      CORS_ORIGIN: http://localhost:${APP_PUBLISHED_PORT:-5174}
+    ports:
+      - "${API_PUBLISHED_PORT:-8001}:8000"
+    volumes:
+      - api_storage:/var/www/html/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/v1/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  app:
+    build:
+      context: ../test-manager-library-3145556-app
+      dockerfile: ../test-manager-library-3145556-infra/docker/app.Dockerfile
+    ports:
+      - "${APP_PUBLISHED_PORT:-5174}:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+
+volumes:
+  postgres_data:
+  api_storage:
